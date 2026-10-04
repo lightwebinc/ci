@@ -32,7 +32,6 @@ on:
         default: false
       golangci-lint-version:
         description: empty skips the lint job
-        # renovate: datasource=github-releases depName=golangci/golangci-lint
         type: string
         default: ""
 
