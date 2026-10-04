@@ -8,6 +8,10 @@ name: image-publish
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: runner labels as JSON (e.g. '["self-hosted", "lax"]' for a private repo)
+        type: string
+        default: '"ubuntu-latest"'
       tag:
         description: image tag without the v prefix (git tag v<tag> must exist)
         type: string
@@ -30,7 +34,7 @@ on:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     environment: ${{ inputs.environment }}
     permissions:
       contents: read

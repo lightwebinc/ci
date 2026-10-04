@@ -4,6 +4,10 @@ name: terraform
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: runner labels as JSON (e.g. '["self-hosted", "lax"]' for a private repo)
+        type: string
+        default: '"ubuntu-latest"'
       dirs:
         description: JSON list of Terraform directories to validate
         type: string
@@ -26,7 +30,7 @@ permissions:
 jobs:
   validate:
     name: terraform validate (${{ matrix.dir }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     strategy:
       fail-fast: false
       matrix:
@@ -46,7 +50,7 @@ jobs:
   trivy:
     name: trivy config
     if: inputs.trivy-scan-ref != ''
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0

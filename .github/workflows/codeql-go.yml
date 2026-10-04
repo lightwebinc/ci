@@ -7,6 +7,10 @@ name: codeql-go
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: runner labels as JSON (e.g. '["self-hosted", "lax"]' for a private repo)
+        type: string
+        default: '"ubuntu-latest"'
       build-mode:
         description: autobuild, or manual (go build ./... in the repo)
         type: string
@@ -23,7 +27,7 @@ jobs:
   analyze:
     name: analyze
     if: github.event.repository.visibility == 'public'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     permissions:
       security-events: write
       actions: read

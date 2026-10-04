@@ -6,6 +6,10 @@ name: helm-release
 on:
   workflow_call:
     inputs:
+      runs-on:
+        description: runner labels as JSON (e.g. '["self-hosted", "lax"]' for a private repo)
+        type: string
+        default: '"ubuntu-latest"'
       chart-path:
         type: string
         default: .
@@ -26,7 +30,7 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
     environment: ${{ inputs.environment }}
     permissions:
       contents: read
