@@ -13,6 +13,10 @@ on:
         # renovate: datasource=golang-version depName=go
         type: string
         default: "1.27.1"
+      build-tags:
+        description: Go build tags (comma separated), e.g. afxdp
+        type: string
+        default: ""
       govulncheck-version:
         # Tracks the Go toolchain in both directions: a release whose x/tools
         # predates the toolchain cannot read its export data and crashes
@@ -34,4 +38,4 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
       - name: govulncheck
-        run: go run "golang.org/x/vuln/cmd/govulncheck@${{ inputs.govulncheck-version }}" ./...
+        run: go run "golang.org/x/vuln/cmd/govulncheck@${{ inputs.govulncheck-version }}" -tags "${{ inputs.build-tags }}" ./...
