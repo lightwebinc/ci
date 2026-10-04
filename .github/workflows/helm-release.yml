@@ -50,6 +50,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # A dry run still proves the push would be ALLOWED: get a push-scoped
+      # registry token, open a blob upload session (202 = write granted), then
+      # cancel it. Nothing is published. Catches a package that has not
+      # granted this repository Actions write access, which otherwise only
+      # surfaces as a 403 on the real release.
+      - name: Verify registry push access (dry run)
+        if: inputs.dry-run
+        working-directory: ${{ inputs.chart-path }}
+        env:
+          REGISTRY: ${{ inputs.registry }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          name=$(awk '/^name:/ {print $2; exit}' Chart.yaml)
+          repo="${REGISTRY#oci://ghcr.io/}/$name"
+          token=$(curl -fsS -u "$ACTOR:$GH_TOKEN" \
+            "https://ghcr.io/token?service=ghcr.io&scope=repository:$repo:push,pull" | jq -r .token)
+          code=$(curl -s -o /dev/null -D /tmp/upload.h -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $token" "https://ghcr.io/v2/$repo/blobs/uploads/")
+          if [ "$code" != 202 ]; then
+            echo "::error::no push access to ghcr.io/$repo (HTTP $code). Grant this repository Actions write on the package: package settings, Manage Actions access."
+            exit 1
+          fi
+          loc=$(awk 'tolower($1)=="location:" {print $2}' /tmp/upload.h | tr -d '\r')
+          case "$loc" in http*) url="$loc" ;; *) url="https://ghcr.io$loc" ;; esac
+          curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $token" "$url" || true
+          echo "push access to ghcr.io/$repo: OK (upload session opened and cancelled)"
+
       - name: Package (and push)
         working-directory: ${{ inputs.chart-path }}
         env:
