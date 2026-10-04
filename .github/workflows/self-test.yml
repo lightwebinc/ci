@@ -20,8 +20,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: actionlint
-        # renovate: datasource=docker depName=rhysd/actionlint
-        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+        env:
+          # renovate: datasource=docker depName=rhysd/actionlint
+          IMAGE: rhysd/actionlint:1.7.12
+        run: docker run --rm -v "$PWD:/repo" -w /repo "$IMAGE" -color
 
   gopipe:
     runs-on: ubuntu-latest

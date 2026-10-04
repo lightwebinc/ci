@@ -1,0 +1,11 @@
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/gh-release.yml
