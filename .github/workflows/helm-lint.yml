@@ -4,6 +4,17 @@
 # per file, the chart-testing convention) and every file under
 # <chart>/examples/, failing on an empty render. Chart-specific scenarios live
 # in those files, not in the caller.
+#
+# Assertions: a render may carry an expectations file beside it, ci/<name>.expect
+# for ci/<name>.yaml (ci/defaults.expect for the default render). One per line:
+#   + text   the render must contain text (fixed string)
+#   - text   the render must not contain text
+# Blank lines and lines starting with # are ignored.
+#
+# Rejections: every ci/reject/<name>.yaml must FAIL to render (a guard or the
+# schema refuses it). ci/reject/<name>.error, when present, holds text the
+# failure output must contain, so a chart-wide syntax error cannot pass as the
+# guard firing.
 name: helm-lint
 
 on:
@@ -20,6 +31,10 @@ on:
         description: extra --set arguments for lint and the default render (one string)
         type: string
         default: ""
+      render-defaults:
+        description: render the chart with defaults (false when bare defaults are rejected by design)
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -44,7 +59,27 @@ jobs:
           # shellcheck disable=SC2086
           helm lint . --strict $SET
 
+      - name: Install the expectation checker
+        run: |
+          cat > /tmp/expect.sh <<'SH'
+          #!/usr/bin/env bash
+          # expect.sh <render> <expect-file>: apply + / - lines to a render.
+          set -euo pipefail
+          render=$1 spec=$2 bad=0
+          while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in
+              ''|'#'*) continue ;;
+              '+ '*) grep -qF -- "${line#+ }" "$render" || { echo "::error::$spec: missing: ${line#+ }"; bad=1; } ;;
+              '- '*) if grep -qF -- "${line#- }" "$render"; then echo "::error::$spec: present: ${line#- }"; bad=1; fi ;;
+              *) echo "::error::$spec: unparseable line: $line"; bad=1 ;;
+            esac
+          done < "$spec"
+          exit $bad
+          SH
+          chmod +x /tmp/expect.sh
+
       - name: helm template (defaults)
+        if: inputs.render-defaults
         working-directory: ${{ inputs.chart-path }}
         env:
           SET: ${{ inputs.set }}
@@ -52,6 +87,7 @@ jobs:
           # shellcheck disable=SC2086
           helm template release-test . $SET --debug > /tmp/render-defaults.yaml
           test -s /tmp/render-defaults.yaml
+          if [ -f ci/defaults.expect ]; then /tmp/expect.sh /tmp/render-defaults.yaml ci/defaults.expect; fi
 
       - name: helm template (ci/ scenarios and examples/)
         working-directory: ${{ inputs.chart-path }}
@@ -63,7 +99,29 @@ jobs:
             out="/tmp/render-$(echo "$f" | tr / -)"
             helm template release-test . -f "$f" --debug > "$out"
             test -s "$out"
+            spec="${f%.*}.expect"
+            if [ -f "$spec" ]; then /tmp/expect.sh "$out" "$spec"; fi
             echo "::endgroup::"
             n=$((n + 1))
           done
           echo "rendered $n scenario file(s)"
+
+      - name: helm template (ci/reject/ must fail)
+        working-directory: ${{ inputs.chart-path }}
+        run: |
+          shopt -s nullglob
+          bad=0 n=0
+          for f in ci/reject/*.yaml ci/reject/*.yml; do
+            n=$((n + 1))
+            if out=$(helm template release-test . -f "$f" 2>&1); then
+              echo "::error::$f rendered, expected a rejection"; bad=1; continue
+            fi
+            want="${f%.*}.error"
+            if [ -f "$want" ] && ! grep -qF -- "$(cat "$want")" <<<"$out"; then
+              echo "::error::$f failed for the wrong reason (wanted: $(cat "$want"))"
+              echo "$out"; bad=1; continue
+            fi
+            echo "rejected as expected: $f"
+          done
+          echo "checked $n rejection file(s)"
+          exit $bad
