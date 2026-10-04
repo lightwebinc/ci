@@ -24,7 +24,7 @@ jobs:
 | `codeql-go.yml` | CodeQL for Go (skips on private repositories) |
 | `gh-release.yml` | GitHub release with generated notes for a tag |
 | `image-publish.yml` | build the Dockerfile at git tag `v<tag>` and push to GHCR (`dry-run` builds only) |
-| `helm-lint.yml` | `helm lint`, then render the defaults, every `ci/*.yaml` scenario (with optional `.expect` assertions) and every `examples/*.yaml`; every `ci/reject/*.yaml` must fail to render |
+| `helm-lint.yml` | `helm lint`, then render the defaults, every `ci/*.yaml` scenario (with optional `.expect` assertions and `.args` extra flags) and every `examples/*.yaml`; every `ci/reject/*.yaml` must fail to render |
 | `helm-release.yml` | package a chart and push it to the OCI registry (`dry-run` packages only) |
 | `ansible-lint.yml` | yamllint and ansible-lint |
 | `terraform.yml` | terraform init, validate and fmt per directory, plus a trivy config scan |

@@ -11,6 +11,9 @@
 #   - text   the render must not contain text
 # Blank lines and lines starting with # are ignored.
 #
+# Extra flags: ci/<name>.args (or ci/reject/<name>.args), when present, holds
+# extra helm arguments for that one render, e.g. --kube-version 1.27.0.
+#
 # Rejections: every ci/reject/<name>.yaml must FAIL to render (a guard or the
 # schema refuses it). ci/reject/<name>.error, when present, holds text the
 # failure output must contain, so a chart-wide syntax error cannot pass as the
@@ -33,6 +36,10 @@ on:
         default: v3.16.0
       set:
         description: extra --set arguments for lint and the default render (one string)
+        type: string
+        default: ""
+      examples-set:
+        description: extra --set arguments for examples/ renders only (e.g. a per-instance id the examples leave empty on purpose)
         type: string
         default: ""
       render-defaults:
@@ -95,13 +102,19 @@ jobs:
 
       - name: helm template (ci/ scenarios and examples/)
         working-directory: ${{ inputs.chart-path }}
+        env:
+          EXAMPLES_SET: ${{ inputs.examples-set }}
         run: |
           shopt -s nullglob
           n=0
           for f in ci/*.yaml ci/*.yml examples/*.yaml examples/*.yml; do
             echo "::group::$f"
             out="/tmp/render-$(echo "$f" | tr / -)"
-            helm template release-test . -f "$f" --debug > "$out"
+            extra=""
+            if [ -f "${f%.*}.args" ]; then extra=$(cat "${f%.*}.args"); fi
+            case "$f" in examples/*) extra="$extra $EXAMPLES_SET" ;; esac
+            # shellcheck disable=SC2086 # extra is a word list by design
+            helm template release-test . -f "$f" $extra --debug > "$out"
             test -s "$out"
             spec="${f%.*}.expect"
             if [ -f "$spec" ]; then /tmp/expect.sh "$out" "$spec"; fi
@@ -117,7 +130,10 @@ jobs:
           bad=0 n=0
           for f in ci/reject/*.yaml ci/reject/*.yml; do
             n=$((n + 1))
-            if out=$(helm template release-test . -f "$f" 2>&1); then
+            extra=""
+            if [ -f "${f%.*}.args" ]; then extra=$(cat "${f%.*}.args"); fi
+            # shellcheck disable=SC2086
+            if out=$(helm template release-test . -f "$f" $extra 2>&1); then
               echo "::error::$f rendered, expected a rejection"; bad=1; continue
             fi
             want="${f%.*}.error"
