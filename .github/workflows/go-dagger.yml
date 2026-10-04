@@ -1,0 +1,84 @@
+# Run one make target of a Go repo's Dagger pipeline (ci/ module, see gopipe).
+#
+# Used for the main CI run (target: ci) and the scheduled vulnerability scan
+# (target: ci-vuln, common-ref: main). The caller keeps its own triggers and
+# any repo-specific jobs; this file owns the shared steps and their pins.
+name: go-dagger
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: make target to run (ci, ci-vuln, ...)
+        type: string
+        default: ci
+      common:
+        description: check out the shared Go module as a sibling directory
+        type: boolean
+        default: true
+      common-repository:
+        type: string
+        default: lightwebinc/shard-common
+      common-ref:
+        description: >-
+          "match" uses the shared module's branch of the same name when one
+          exists (so a change there is tested against this repo before it is
+          tagged) and main otherwise; anything else is used as the ref.
+        type: string
+        default: match
+      runs-on:
+        description: runner labels as JSON
+        type: string
+        default: '"ubuntu-latest"'
+
+permissions:
+  contents: read
+
+jobs:
+  dagger:
+    name: ${{ inputs.target }} (dagger)
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ${{ github.event.repository.name }}
+
+      - name: Resolve shared module ref
+        id: common_ref
+        if: inputs.common
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WANT: ${{ inputs.common-ref }}
+          REPO: ${{ inputs.common-repository }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if [ "$WANT" != "match" ]; then
+            ref="$WANT"
+          elif [ -n "$BRANCH" ] && gh api "repos/$REPO/branches/$BRANCH" >/dev/null 2>&1; then
+            ref="$BRANCH"
+          else
+            ref=main
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "Using $REPO@$ref"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: inputs.common
+        with:
+          repository: ${{ inputs.common-repository }}
+          ref: ${{ steps.common_ref.outputs.ref }}
+          path: shard-common
+
+      # The pipeline runs Go inside containers; host Go only has to build the
+      # ci/ module that drives it. No Actions cache: the Dagger engine holds
+      # the real caches, and a cache-save post-step costs more than it saves.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ github.event.repository.name }}/ci/go.mod
+          cache: false
+
+      - name: make ${{ inputs.target }}
+        working-directory: ${{ github.event.repository.name }}
+        env:
+          GOWORK: "off"
+        run: make "${{ inputs.target }}"

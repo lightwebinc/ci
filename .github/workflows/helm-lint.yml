@@ -1,0 +1,69 @@
+# Lint and render a Helm chart.
+#
+# Renders the defaults, then every values file under <chart>/ci/ (one scenario
+# per file, the chart-testing convention) and every file under
+# <chart>/examples/, failing on an empty render. Chart-specific scenarios live
+# in those files, not in the caller.
+name: helm-lint
+
+on:
+  workflow_call:
+    inputs:
+      chart-path:
+        type: string
+        default: .
+      helm-version:
+        # renovate: datasource=github-releases depName=helm/helm
+        type: string
+        default: v3.16.0
+      set:
+        description: extra --set arguments for lint and the default render (one string)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: ${{ inputs.helm-version }}
+
+      - name: helm lint
+        working-directory: ${{ inputs.chart-path }}
+        env:
+          SET: ${{ inputs.set }}
+        run: |
+          # shellcheck disable=SC2086 # SET is a word list by design
+          helm lint . $SET
+          # shellcheck disable=SC2086
+          helm lint . --strict $SET
+
+      - name: helm template (defaults)
+        working-directory: ${{ inputs.chart-path }}
+        env:
+          SET: ${{ inputs.set }}
+        run: |
+          # shellcheck disable=SC2086
+          helm template release-test . $SET --debug > /tmp/render-defaults.yaml
+          test -s /tmp/render-defaults.yaml
+
+      - name: helm template (ci/ scenarios and examples/)
+        working-directory: ${{ inputs.chart-path }}
+        run: |
+          shopt -s nullglob
+          n=0
+          for f in ci/*.yaml ci/*.yml examples/*.yaml examples/*.yml; do
+            echo "::group::$f"
+            out="/tmp/render-$(echo "$f" | tr / -)"
+            helm template release-test . -f "$f" --debug > "$out"
+            test -s "$out"
+            echo "::endgroup::"
+            n=$((n + 1))
+          done
+          echo "rendered $n scenario file(s)"

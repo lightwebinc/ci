@@ -1,0 +1,58 @@
+# terraform init/validate/fmt per directory, plus a trivy config scan.
+name: terraform
+
+on:
+  workflow_call:
+    inputs:
+      dirs:
+        description: JSON list of Terraform directories to validate
+        type: string
+        required: true
+      terraform-version:
+        # renovate: datasource=github-releases depName=hashicorp/terraform
+        type: string
+        default: "1.9"
+      trivy-scan-ref:
+        description: path for the trivy config scan ("" skips it)
+        type: string
+        default: terraform/
+      trivyignores:
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: terraform validate (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(inputs.dirs) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ inputs.terraform-version }}
+      - run: terraform init -backend=false
+        working-directory: ${{ matrix.dir }}
+      - run: terraform validate
+        working-directory: ${{ matrix.dir }}
+      - run: terraform fmt -check -recursive
+        working-directory: ${{ matrix.dir }}
+
+  trivy:
+    name: trivy config
+    if: inputs.trivy-scan-ref != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          scan-type: config
+          scan-ref: ${{ inputs.trivy-scan-ref }}
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          trivyignores: ${{ inputs.trivyignores }}

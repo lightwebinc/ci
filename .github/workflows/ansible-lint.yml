@@ -1,0 +1,58 @@
+# yamllint and ansible-lint for an Ansible tree. Repo policy (skip lists,
+# per-file ignores) stays in the caller's .ansible-lint, .ansible-lint-ignore
+# and .yamllint* files; this file only pins the tools.
+name: ansible-lint
+
+on:
+  workflow_call:
+    inputs:
+      path:
+        type: string
+        default: ansible/
+      python-version:
+        type: string
+        default: "3.12"
+      ansible-lint-version:
+        # renovate: datasource=pypi depName=ansible-lint
+        type: string
+        default: 26.9.0
+      yamllint-version:
+        # renovate: datasource=pypi depName=yamllint
+        type: string
+        default: 1.38.0
+      collections:
+        description: ansible-galaxy collection specs, space separated
+        type: string
+        default: "community.general>=10.0 ansible.posix>=2.0"
+
+permissions:
+  contents: read
+
+jobs:
+  yamllint:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ inputs.python-version }}
+      - run: pip install "yamllint==${{ inputs.yamllint-version }}"
+      - run: yamllint "${{ inputs.path }}"
+
+  ansible-lint:
+    name: ansible-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ inputs.python-version }}
+      - run: pip install "ansible-lint==${{ inputs.ansible-lint-version }}"
+      - name: Install Ansible collections
+        env:
+          COLLECTIONS: ${{ inputs.collections }}
+        run: |
+          # shellcheck disable=SC2086 # word list by design
+          ansible-galaxy collection install $COLLECTIONS
+      - run: ansible-lint "${{ inputs.path }}"

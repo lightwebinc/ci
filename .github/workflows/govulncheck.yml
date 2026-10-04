@@ -1,0 +1,33 @@
+# govulncheck on the host toolchain, for repos without a Dagger pipeline.
+# Dagger repos scan inside the pipeline instead (go-dagger, target ci-vuln).
+name: govulncheck
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        # renovate: datasource=golang-version depName=go
+        type: string
+        default: "1.27.1"
+      govulncheck-version:
+        # Tracks the Go toolchain in both directions: a release whose x/tools
+        # predates the toolchain cannot read its export data and crashes
+        # instead of scanning. Re-check on every toolchain bump.
+        # renovate: datasource=go depName=golang.org/x/vuln
+        type: string
+        default: v1.7.0
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ inputs.go-version }}
+      - name: govulncheck
+        run: go run "golang.org/x/vuln/cmd/govulncheck@${{ inputs.govulncheck-version }}" ./...

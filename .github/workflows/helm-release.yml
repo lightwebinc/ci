@@ -1,0 +1,62 @@
+# Package a Helm chart and push it to an OCI registry. The caller owns the
+# manual trigger and its RELEASE confirmation. The registry is the release
+# record: no git tag is created.
+name: helm-release
+
+on:
+  workflow_call:
+    inputs:
+      chart-path:
+        type: string
+        default: .
+      helm-version:
+        # renovate: datasource=github-releases depName=helm/helm
+        type: string
+        default: v3.16.0
+      registry:
+        type: string
+        default: oci://ghcr.io/lightwebinc/charts
+      environment:
+        description: GitHub Environment gating the push ("" for none)
+        type: string
+        default: production
+      dry-run:
+        type: boolean
+        default: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: ${{ inputs.helm-version }}
+
+      - name: Login to GHCR
+        if: ${{ !inputs.dry-run }}
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package (and push)
+        working-directory: ${{ inputs.chart-path }}
+        env:
+          REGISTRY: ${{ inputs.registry }}
+          DRY: ${{ inputs.dry-run }}
+        run: |
+          helm package .
+          for tgz in *.tgz; do
+            if [ "$DRY" = "true" ]; then
+              echo "dry run: would push $tgz to $REGISTRY"
+            else
+              helm push "$tgz" "$REGISTRY"
+            fi
+          done
