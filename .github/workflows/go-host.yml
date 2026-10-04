@@ -21,6 +21,10 @@ on:
         description: JSON list of GOOS targets; linux runs tests, others build and vet
         type: string
         default: '["linux"]'
+      build-tags:
+        description: Go build tags for vet, build and test (comma separated), e.g. afxdp
+        type: string
+        default: ""
       gofmt:
         type: boolean
         default: false
@@ -67,15 +71,15 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: amd64
-        run: go vet ./...
+        run: go vet -tags "${{ inputs.build-tags }}" ./...
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: amd64
-        run: go build -buildvcs=false ./...
+        run: go build -buildvcs=false -tags "${{ inputs.build-tags }}" ./...
       - name: test
         if: matrix.goos == 'linux'
-        run: go test ${{ inputs.race && '-race' || '' }} ./...
+        run: go test ${{ inputs.race && '-race' || '' }} -tags "${{ inputs.build-tags }}" ./...
       - name: third-party licences are current
         if: inputs.licences-check && matrix.goos == 'linux'
         run: python3 scripts/gen-third-party-licenses.py . --check
