@@ -15,7 +15,7 @@ on:
       terraform-version:
         # renovate: datasource=github-releases depName=hashicorp/terraform extractVersion=^v(?<version>.+)$
         type: string
-        default: "1.9"
+        default: "1.16.5"
       trivy-scan-ref:
         description: path for the trivy config scan ("" skips it)
         type: string
