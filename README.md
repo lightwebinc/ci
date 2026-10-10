@@ -13,7 +13,7 @@ comment:
 ```yaml
 jobs:
   ci:
-    uses: lightwebinc/ci/.github/workflows/go-dagger.yml@<sha> # v0.1.0
+    uses: lightwebinc/ci/.github/workflows/go-dagger.yml@<sha> # v0.5.1
 ```
 
 | workflow | what it runs |
@@ -28,6 +28,13 @@ jobs:
 | `helm-release.yml` | package a chart and push it to the OCI registry (`dry-run` packages only) |
 | `ansible-lint.yml` | yamllint and ansible-lint |
 | `terraform.yml` | terraform init, validate and fmt per directory, plus a trivy config scan |
+
+This repository's own workflows (not for callers):
+
+| workflow | what it runs |
+|---|---|
+| `self-test.yml` | actionlint (with shellcheck) over every workflow, and build + vet of `gopipe` |
+| `release.yml` | on a `v*.*.*` tag, calls `gh-release.yml` |
 
 Every workflow takes a `runs-on` input (runner labels as JSON) so a private
 repository can keep its jobs on self-hosted runners. Triggers, schedules,
