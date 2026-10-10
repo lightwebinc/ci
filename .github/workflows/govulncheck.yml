@@ -12,7 +12,7 @@ on:
       go-version:
         # renovate: datasource=golang-version depName=go
         type: string
-        default: "1.27.1"
+        default: "1.27.2"
       build-tags:
         description: Go build tags (comma separated), e.g. afxdp
         type: string
