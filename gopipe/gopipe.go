@@ -47,7 +47,7 @@ import (
 // updater bumps it here and nowhere else.
 const (
 	// renovate: datasource=docker depName=golang
-	GoImage = "golang:1.27.1-alpine"
+	GoImage = "golang:1.27.2-alpine"
 	// renovate: datasource=docker depName=golangci/golangci-lint
 	LintImage = "golangci/golangci-lint:v2.13.2-alpine"
 	// The govulncheck pin tracks the Go toolchain in both directions: a
