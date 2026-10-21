@@ -13,7 +13,7 @@ comment:
 ```yaml
 jobs:
   ci:
-    uses: lightwebinc/ci/.github/workflows/go-dagger.yml@<sha> # v0.5.1
+    uses: lightwebinc/ci/.github/workflows/go-dagger.yml@<sha> # v0.5.2
 ```
 
 | workflow | what it runs |
