@@ -103,7 +103,10 @@ jobs:
           mods=""
           for r in $(echo "$REPOS" | tr ',' ' '); do
             mods="${mods:+$mods,}github.com/${OWNER}/${r}"
-            GIT_CONFIG_GLOBAL="$cfg" git ls-remote -q "https://github.com/${OWNER}/${r}" HEAD >/dev/null ||
+            # Outside the checkout: its repo-local extraheader (this job's
+            # GITHUB_TOKEN) would win over the rewrite. go runs git in the
+            # module cache, so it never sees that header either.
+            (cd "$RUNNER_TEMP" && GIT_CONFIG_GLOBAL="$cfg" git ls-remote -q "https://github.com/${OWNER}/${r}" HEAD >/dev/null) ||
               { echo "::error::cannot read ${OWNER}/${r}: is it in the App installation?"; exit 1; }
           done
           { echo "GIT_CONFIG_GLOBAL=$cfg"; echo "GOPRIVATE=$mods"; echo "GONOSUMDB=$mods"; } >> "$GITHUB_ENV"
@@ -174,7 +177,10 @@ jobs:
           mods=""
           for r in $(echo "$REPOS" | tr ',' ' '); do
             mods="${mods:+$mods,}github.com/${OWNER}/${r}"
-            GIT_CONFIG_GLOBAL="$cfg" git ls-remote -q "https://github.com/${OWNER}/${r}" HEAD >/dev/null ||
+            # Outside the checkout: its repo-local extraheader (this job's
+            # GITHUB_TOKEN) would win over the rewrite. go runs git in the
+            # module cache, so it never sees that header either.
+            (cd "$RUNNER_TEMP" && GIT_CONFIG_GLOBAL="$cfg" git ls-remote -q "https://github.com/${OWNER}/${r}" HEAD >/dev/null) ||
               { echo "::error::cannot read ${OWNER}/${r}: is it in the App installation?"; exit 1; }
           done
           { echo "GIT_CONFIG_GLOBAL=$cfg"; echo "GOPRIVATE=$mods"; echo "GONOSUMDB=$mods"; } >> "$GITHUB_ENV"
