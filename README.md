@@ -36,6 +36,14 @@ This repository's own workflows (not for callers):
 | `self-test.yml` | actionlint (with shellcheck) over every workflow, and build + vet of `gopipe` |
 | `release.yml` | on a `v*.*.*` tag, calls `gh-release.yml` |
 
+`go-host.yml` fetches a caller's private Go modules when given
+`private-modules` (comma-separated repository names) and the
+`private-modules-app-id` / `private-modules-app-key` secrets of a GitHub App
+installed on those repositories with Contents read. Each job mints its own
+token, read-only and limited to the listed repositories, which is revoked when
+the job ends; GOPRIVATE names only those modules, so public modules still come
+through the proxy and the checksum database.
+
 Every workflow takes a `runs-on` input (runner labels as JSON) so a private
 repository can keep its jobs on self-hosted runners. Triggers, schedules,
 permissions and anything specific to one repository stay in the calling

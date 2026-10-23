@@ -42,6 +42,21 @@ on:
         description: empty skips the lint job
         type: string
         default: ""
+      private-modules:
+        description: >-
+          comma-separated repositories of the caller's owner whose PRIVATE Go
+          modules the build fetches (e.g. "bstore,blogs"); needs the
+          private-modules-app-* secrets. Empty: every module comes through the
+          public proxy.
+        type: string
+        default: ""
+    secrets:
+      private-modules-app-id:
+        description: a GitHub App installed on those repositories with Contents read
+        required: false
+      private-modules-app-key:
+        description: that App's private key (.pem)
+        required: false
 
 permissions:
   contents: read
@@ -59,6 +74,40 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ inputs.go-version }}
+      # Private modules: a token minted for this job only, Contents read on
+      # exactly the listed repositories, revoked when the job ends. git reads
+      # it through a job-scoped config (the runner's own ~/.gitconfig is not
+      # touched), and GOPRIVATE lists only those modules, so every public
+      # module still comes through the proxy and the checksum database.
+      - name: private module token
+        id: modtoken
+        if: inputs.private-modules != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.private-modules-app-id }}
+          private-key: ${{ secrets.private-modules-app-key }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ inputs.private-modules }}
+          permission-contents: read
+      - name: private module access
+        if: inputs.private-modules != ''
+        env:
+          TOKEN: ${{ steps.modtoken.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+          REPOS: ${{ inputs.private-modules }}
+        run: |
+          cfg="$RUNNER_TEMP/private-modules.gitconfig"
+          install -m 600 /dev/null "$cfg"
+          if [ -f "$HOME/.gitconfig" ]; then git config --file "$cfg" include.path "$HOME/.gitconfig"; fi
+          git config --file "$cfg" "url.https://x-access-token:${TOKEN}@github.com/${OWNER}/.insteadOf" "https://github.com/${OWNER}/"
+          mods=""
+          for r in $(echo "$REPOS" | tr ',' ' '); do
+            mods="${mods:+$mods,}github.com/${OWNER}/${r}"
+            GIT_CONFIG_GLOBAL="$cfg" git ls-remote -q "https://github.com/${OWNER}/${r}" HEAD >/dev/null ||
+              { echo "::error::cannot read ${OWNER}/${r}: is it in the App installation?"; exit 1; }
+          done
+          { echo "GIT_CONFIG_GLOBAL=$cfg"; echo "GOPRIVATE=$mods"; echo "GONOSUMDB=$mods"; } >> "$GITHUB_ENV"
+          echo "private modules: $mods"
       - name: gofmt
         if: inputs.gofmt && matrix.goos == 'linux'
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
@@ -83,6 +132,9 @@ jobs:
       - name: third-party licences are current
         if: inputs.licences-check && matrix.goos == 'linux'
         run: python3 scripts/gen-third-party-licenses.py . --check
+      - name: drop private module access
+        if: always() && inputs.private-modules != ''
+        run: rm -f "$RUNNER_TEMP/private-modules.gitconfig"
 
   lint:
     name: golangci-lint
@@ -93,6 +145,40 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ inputs.go-version }}
+      # Private modules: a token minted for this job only, Contents read on
+      # exactly the listed repositories, revoked when the job ends. git reads
+      # it through a job-scoped config (the runner's own ~/.gitconfig is not
+      # touched), and GOPRIVATE lists only those modules, so every public
+      # module still comes through the proxy and the checksum database.
+      - name: private module token
+        id: modtoken
+        if: inputs.private-modules != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.private-modules-app-id }}
+          private-key: ${{ secrets.private-modules-app-key }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ inputs.private-modules }}
+          permission-contents: read
+      - name: private module access
+        if: inputs.private-modules != ''
+        env:
+          TOKEN: ${{ steps.modtoken.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+          REPOS: ${{ inputs.private-modules }}
+        run: |
+          cfg="$RUNNER_TEMP/private-modules.gitconfig"
+          install -m 600 /dev/null "$cfg"
+          if [ -f "$HOME/.gitconfig" ]; then git config --file "$cfg" include.path "$HOME/.gitconfig"; fi
+          git config --file "$cfg" "url.https://x-access-token:${TOKEN}@github.com/${OWNER}/.insteadOf" "https://github.com/${OWNER}/"
+          mods=""
+          for r in $(echo "$REPOS" | tr ',' ' '); do
+            mods="${mods:+$mods,}github.com/${OWNER}/${r}"
+            GIT_CONFIG_GLOBAL="$cfg" git ls-remote -q "https://github.com/${OWNER}/${r}" HEAD >/dev/null ||
+              { echo "::error::cannot read ${OWNER}/${r}: is it in the App installation?"; exit 1; }
+          done
+          { echo "GIT_CONFIG_GLOBAL=$cfg"; echo "GOPRIVATE=$mods"; echo "GONOSUMDB=$mods"; } >> "$GITHUB_ENV"
+          echo "private modules: $mods"
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: ${{ inputs.golangci-lint-version }}
