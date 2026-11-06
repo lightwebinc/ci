@@ -23,7 +23,7 @@ on:
         # instead of scanning. Re-check on every toolchain bump.
         # renovate: datasource=go depName=golang.org/x/vuln
         type: string
-        default: v1.7.0
+        default: v1.9.0
 
 permissions:
   contents: read

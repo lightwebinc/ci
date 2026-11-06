@@ -33,7 +33,7 @@ on:
       helm-version:
         # renovate: datasource=github-releases depName=helm/helm
         type: string
-        default: v3.16.0
+        default: v3.22.1
       set:
         description: extra --set arguments for lint and the default render (one string)
         type: string

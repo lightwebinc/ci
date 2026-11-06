@@ -49,12 +49,12 @@ const (
 	// renovate: datasource=docker depName=golang
 	GoImage = "golang:1.27.3-alpine"
 	// renovate: datasource=docker depName=golangci/golangci-lint
-	LintImage = "golangci/golangci-lint:v2.13.2-alpine"
+	LintImage = "golangci/golangci-lint:v2.15.0-alpine"
 	// The govulncheck pin tracks the Go toolchain in both directions: a
 	// release built against older x/tools cannot read newer export data and
 	// crashes instead of scanning. Re-check it on every toolchain bump.
 	// renovate: datasource=go depName=golang.org/x/vuln
-	GovulncheckVersion = "v1.7.0"
+	GovulncheckVersion = "v1.9.0"
 )
 
 // DefaultCommonModule is the shared module that consumer repos build against
