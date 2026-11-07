@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       runs-on:
-        description: runner labels as JSON (e.g. '["self-hosted", "lax"]' for a private repo)
+        description: runner labels as JSON (e.g. '["self-hosted", "<label>"]' for a private repo)
         type: string
         default: '"ubuntu-latest"'
       chart-path:
