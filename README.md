@@ -13,13 +13,13 @@ comment:
 ```yaml
 jobs:
   ci:
-    uses: lightwebinc/ci/.github/workflows/go-dagger.yml@<sha> # v0.5.2
+    uses: lightwebinc/ci/.github/workflows/go-dagger.yml@<sha> # v0.6.0
 ```
 
 | workflow | what it runs |
 |---|---|
 | `go-dagger.yml` | one make target of the repo's Dagger pipeline (`ci`, `ci-vuln`, ...) with the shared module checked out as a sibling |
-| `go-host.yml` | host-Go build, vet, race tests, optional gofmt, tidy, cross-OS build, golangci-lint and licence checks |
+| `go-host.yml` | host-Go build, vet, race tests, optional gofmt, tidy, cross-OS build, golangci-lint and license checks |
 | `govulncheck.yml` | govulncheck on the host toolchain |
 | `codeql-go.yml` | CodeQL for Go (skips on private repositories) |
 | `gh-release.yml` | GitHub release with generated notes for a tag |

@@ -1,5 +1,5 @@
 # Plain host-Go checks for repos without a Dagger pipeline: build, vet, race
-# tests, and optional gofmt, tidy, cross-OS, golangci-lint and licence checks.
+# tests, and optional gofmt, tidy, cross-OS, golangci-lint and license checks.
 name: go-host
 
 on:
@@ -132,7 +132,7 @@ jobs:
       - name: test
         if: matrix.goos == 'linux'
         run: go test ${{ inputs.race && '-race' || '' }} -tags "${{ inputs.build-tags }}" ./...
-      - name: third-party licences are current
+      - name: third-party licenses are current
         if: inputs.licences-check && matrix.goos == 'linux'
         run: python3 scripts/gen-third-party-licenses.py . --check
       - name: drop private module access
