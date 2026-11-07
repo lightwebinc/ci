@@ -1,0 +1,38 @@
+# Lints the caller's GitHub Actions workflows: actionlint for syntax,
+# expressions and shellcheck, zizmor for security. A zizmor finding of
+# medium severity or above fails the job.
+name: workflow-lint
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: runner labels as JSON
+        type: string
+        default: '["ubuntu-latest"]'
+      zizmor-version:
+        description: zizmor release from PyPI
+        type: string
+        default: "1.32.0"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: workflow-lint
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint
+        env:
+          # renovate: datasource=docker depName=rhysd/actionlint
+          IMAGE: rhysd/actionlint:1.7.12
+        run: docker run --rm -v "$PWD:/repo" -w /repo "$IMAGE" -color
+      - name: zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIZMOR_VERSION: ${{ inputs.zizmor-version }}
+        run: pipx run "zizmor==$ZIZMOR_VERSION" --min-severity medium --format github .github/workflows

@@ -38,25 +38,37 @@ jobs:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ inputs.python-version }}
-      - run: pip install "yamllint==${{ inputs.yamllint-version }}"
-      - run: yamllint "${{ inputs.path }}"
+      - env:
+          YAMLLINT_VERSION: ${{ inputs.yamllint-version }}
+        run: pip install "yamllint==$YAMLLINT_VERSION"
+      - env:
+          TARGET_PATH: ${{ inputs.path }}
+        run: yamllint "$TARGET_PATH"
 
   ansible-lint:
     name: ansible-lint
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ inputs.python-version }}
-      - run: pip install "ansible-lint==${{ inputs.ansible-lint-version }}"
+      - env:
+          ANSIBLE_LINT_VERSION: ${{ inputs.ansible-lint-version }}
+        run: pip install "ansible-lint==$ANSIBLE_LINT_VERSION"
       - name: Install Ansible collections
         env:
           COLLECTIONS: ${{ inputs.collections }}
         run: |
           # shellcheck disable=SC2086 # word list by design
           ansible-galaxy collection install $COLLECTIONS
-      - run: ansible-lint "${{ inputs.path }}"
+      - env:
+          TARGET_PATH: ${{ inputs.path }}
+        run: ansible-lint "$TARGET_PATH"

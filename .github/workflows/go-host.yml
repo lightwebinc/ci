@@ -71,6 +71,8 @@ jobs:
         goos: ${{ fromJSON(inputs.goos) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ inputs.go-version }}
@@ -123,15 +125,20 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: amd64
-        run: go vet -tags "${{ inputs.build-tags }}" ./...
+          BUILD_TAGS: ${{ inputs.build-tags }}
+        run: go vet -tags "$BUILD_TAGS" ./...
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: amd64
-        run: go build -buildvcs=false -tags "${{ inputs.build-tags }}" ./...
+          BUILD_TAGS: ${{ inputs.build-tags }}
+        run: go build -buildvcs=false -tags "$BUILD_TAGS" ./...
       - name: test
         if: matrix.goos == 'linux'
-        run: go test ${{ inputs.race && '-race' || '' }} -tags "${{ inputs.build-tags }}" ./...
+        env:
+          RACE: ${{ inputs.race && '-race' || '' }}
+          BUILD_TAGS: ${{ inputs.build-tags }}
+        run: go test ${RACE:+"$RACE"} -tags "$BUILD_TAGS" ./...
       - name: third-party licenses are current
         if: inputs.licences-check && matrix.goos == 'linux'
         run: python3 scripts/gen-third-party-licenses.py . --check
@@ -145,6 +152,8 @@ jobs:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ inputs.go-version }}

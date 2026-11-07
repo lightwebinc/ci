@@ -35,11 +35,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           path: ${{ github.event.repository.name }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: inputs.common
         with:
+          persist-credentials: false
           repository: ${{ inputs.common-repository }}
           path: shard-common
 
@@ -50,7 +52,9 @@ jobs:
       - name: Use the sibling shared module
         if: inputs.common
         working-directory: ${{ github.event.repository.name }}
-        run: go mod edit -replace "github.com/${{ inputs.common-repository }}=../shard-common"
+        env:
+          COMMON_REPO: ${{ inputs.common-repository }}
+        run: go mod edit -replace "github.com/$COMMON_REPO=../shard-common"
 
       - name: Initialize CodeQL (autobuild)
         if: inputs.build-mode == 'autobuild'

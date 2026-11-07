@@ -28,12 +28,13 @@ jobs:
 | `helm-release.yml` | package a chart and push it to the OCI registry (`dry-run` packages only) |
 | `ansible-lint.yml` | yamllint and ansible-lint |
 | `terraform.yml` | terraform init, validate and fmt per directory, plus a trivy config scan |
+| `workflow-lint.yml` | actionlint (with shellcheck) and zizmor over the caller's workflows; a zizmor finding of medium severity or above fails |
 
 This repository's own workflows (not for callers):
 
 | workflow | what it runs |
 |---|---|
-| `self-test.yml` | actionlint (with shellcheck) over every workflow, and build + vet of `gopipe` |
+| `self-test.yml` | `workflow-lint.yml` over this repository, and build + vet of `gopipe` |
 | `release.yml` | on a `v*.*.*` tag, calls `gh-release.yml` |
 
 `go-host.yml` fetches a caller's private Go modules when given

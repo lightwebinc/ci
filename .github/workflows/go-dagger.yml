@@ -41,6 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           path: ${{ github.event.repository.name }}
 
       - name: Resolve shared module ref
@@ -65,6 +66,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: inputs.common
         with:
+          persist-credentials: false
           repository: ${{ inputs.common-repository }}
           ref: ${{ steps.common_ref.outputs.ref }}
           path: shard-common
@@ -81,4 +83,5 @@ jobs:
         working-directory: ${{ github.event.repository.name }}
         env:
           GOWORK: "off"
-        run: make "${{ inputs.target }}"
+          TARGET: ${{ inputs.target }}
+        run: make "$TARGET"
