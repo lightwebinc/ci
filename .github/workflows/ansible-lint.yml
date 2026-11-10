@@ -19,7 +19,7 @@ on:
       ansible-lint-version:
         # renovate: datasource=pypi depName=ansible-lint
         type: string
-        default: 26.10.1
+        default: 26.11.0
       yamllint-version:
         # renovate: datasource=pypi depName=yamllint
         type: string
