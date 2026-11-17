@@ -31,7 +31,9 @@ a pinned commit, so every repository generates its file the same way.
 Usage:  gen-third-party-licenses.py <repo-dir> [--check]
         --check exits 1 if the file on disk differs from what would be written.
 """
+import json
 import os
+import re
 import subprocess
 import sys
 
@@ -41,6 +43,28 @@ import sys
 # ships one, which reads as an upstream failing rather than a bug here.
 LICENSE_STEMS = ("license", "licence", "copying")
 LICENSE_EXTS = ("", ".txt", ".md", ".rst")
+# A package under two licences often ships one file each, named for the
+# licence: LICENSE-MIT beside LICENSE-APACHE, or LICENSE.BSD. Taking only the
+# bare name would reproduce one text and call it all of them.
+LICENSE_NAME = re.compile(r"^(?:%s)((?:[-_.][a-z0-9+]+)*)$" % "|".join(LICENSE_STEMS))
+# Suffixes that make a file named like a licence something else: a template,
+# source, or an inventory of OTHER packages' licences (LICENSE-THIRD-PARTY,
+# which this script itself writes). An inventory is left out because each
+# package it lists is linked here too and is reproduced under its own entry.
+NOT_A_TEXT = {
+    "csv", "json", "yaml", "yml", "tmpl", "tpl", "go", "py", "js", "ts", "sh", "html", "xml",
+    "third", "party", "thirdparty", "3rdparty", "3rd", "dependencies", "deps",
+}
+
+
+def is_license_name(name):
+    low = name.lower()
+    stem, ext = os.path.splitext(low)
+    if ext in LICENSE_EXTS and ext:
+        low = stem
+    m = LICENSE_NAME.match(low)
+    return bool(m) and not (set(re.split(r"[-_.]", m.group(1))) & NOT_A_TEXT)
+
 
 # A package may ship its licences in a directory rather than a flat file, which
 # is the REUSE layout and what the BSV packages use. The text still has to
@@ -115,8 +139,7 @@ def license_files(d):
                     if os.path.isfile(os.path.join(p, f))
                 )
             continue
-        stem, ext = os.path.splitext(low)
-        if stem in LICENSE_STEMS and ext in LICENSE_EXTS:
+        if is_license_name(e):
             found.append(p)
     return found
 
@@ -197,25 +220,26 @@ def detect(texts):
     return ", ".join(sorted(found, key=found.get))
 
 
-def npm_packages(repo):
-    """The production dependency tree, which is what a production image holds.
-
-    `tsc` does not bundle: the built JavaScript resolves bare imports against
-    node_modules at runtime, so every package here is physically present in the
-    image and its licence travels only if it is written down.
+def npm_tree(repo):
+    """The production dependency tree as npm reports it.
 
     Peer dependencies are left out. A peer is not installed by this package but
     supplied by whoever installs it, as their own copy under their own
     obligation, and npm 7+ would otherwise list it as though this package
     brought it.
-    """
-    import json as _json
 
+    A tree npm could not read is a failure, never an empty tree: an empty
+    tree renders as "nothing is installed", which is a claim. npm exits
+    non-zero for a readable tree that merely has problems, so the exit code
+    alone does not say which; a document with an error and no package of its
+    own does.
+    """
     # NPM_LS_JSON lets a caller supply the tree from elsewhere, for the common
     # case where node lives in a container and this script runs on the host.
     supplied = os.environ.get("NPM_LS_JSON")
     if supplied:
-        raw = open(supplied, encoding="utf-8").read()
+        with open(supplied, encoding="utf-8") as f:
+            raw = f.read()
     else:
         out = subprocess.run(
             ["npm", "ls", "--omit=dev", "--omit=peer", "--all", "--json"],
@@ -223,29 +247,84 @@ def npm_packages(repo):
         )
         raw = out.stdout
     try:
-        tree = _json.loads(raw)
+        tree = json.loads(raw)
     except ValueError:
         sys.exit("npm ls produced no JSON; run `npm ci` first, or set NPM_LS_JSON")
+    if not isinstance(tree, dict):
+        sys.exit("npm ls produced no dependency tree")
+    if "error" in tree and "name" not in tree and "dependencies" not in tree:
+        err = tree["error"]
+        why = err.get("summary") or err.get("code") if isinstance(err, dict) else err
+        sys.exit(f"npm ls failed: {why}")
+    return tree
+
+
+def installed_at(repo, parent, name, version):
+    """Where the copy of name that parent resolves is installed.
+
+    npm ls reports who depends on whom, not where each copy sits: two versions
+    of one package live at different depths. Node finds a dependency by looking
+    in the dependent's own node_modules and then in each directory above it, so
+    the same walk finds the copy this edge means. A copy whose version is not
+    the one asked for is passed over, which keeps a hoisted other version from
+    lending its licence to this one.
+    """
+    root = os.path.abspath(repo)
+    d = os.path.abspath(parent)
+    while True:
+        cand = os.path.join(d, "node_modules", *name.split("/"))
+        if os.path.isdir(cand):
+            try:
+                with open(os.path.join(cand, "package.json"), encoding="utf-8") as f:
+                    have = json.load(f).get("version")
+            except (OSError, ValueError):
+                have = None
+            if have is None or not version or have == version:
+                return cand
+        if d == root or os.path.dirname(d) == d:
+            return None
+        # Step out of this package: past its own folder and the node_modules
+        # (and any scope folder) that holds it.
+        d = os.path.dirname(d)
+        while os.path.basename(d) != "node_modules" and d != root and os.path.dirname(d) != d:
+            d = os.path.dirname(d)
+        if os.path.basename(d) == "node_modules":
+            d = os.path.dirname(d)
+
+
+def npm_packages(repo, tree=None):
+    """Every (name, version, directory) in the production tree, once each.
+
+    `tsc` does not bundle: the built JavaScript resolves bare imports against
+    node_modules at runtime, so every package here is physically present in the
+    image and its licence travels only if it is written down.
+
+    Every node's children are walked, including a node already recorded: npm
+    abbreviates a package it has printed before, so the first sighting may be
+    the one without its dependencies.
+    """
+    if tree is None:
+        tree = npm_tree(repo)
     seen = {}
 
-    def walk(node):
-        for name, info in (node.get("dependencies") or {}).items():
-            key = (name, info.get("version") or "")
-            if key in seen:
+    def walk(node, parent):
+        for name, info in sorted((node.get("dependencies") or {}).items()):
+            if not isinstance(info, dict):
                 continue
-            seen[key] = True
-            walk(info)
+            version = info.get("version") or ""
+            d = installed_at(repo, parent, name, version)
+            seen.setdefault((name, version), d)
+            walk(info, d or parent)
 
-    walk(tree)
-    return sorted(seen)
+    walk(tree, repo)
+    return sorted((n, v, d) for (n, v), d in seen.items())
 
 
 def npm_build(repo, repo_name):
     entries = []
-    for name, version in npm_packages(repo):
-        d = os.path.join(repo, "node_modules", *name.split("/"))
-        if not os.path.isdir(d):
-            sys.exit(f"{name}: not installed at {d}; run `npm ci` first")
+    for name, version, d in npm_packages(repo):
+        if not d:
+            sys.exit(f"{name}@{version}: not installed under {repo}; run `npm ci` first")
         files = license_files(d)
         if not files:
             sys.exit(f"{name}: no licence file in {d}. Resolve by hand before shipping.")
@@ -262,10 +341,8 @@ def title(repo, npm):
     is skipped, because it names the version, not the module.
     """
     if npm:
-        import json as _json
-
         with open(os.path.join(repo, "package.json"), encoding="utf-8") as f:
-            name = _json.load(f).get("name") or ""
+            name = json.load(f).get("name") or ""
         name = name.rsplit("/", 1)[-1]
     else:
         parts = own_module(repo).split("/")
@@ -284,10 +361,8 @@ def build(repo):
     # decided by what it builds, not by whether it has a release workflow,
     # because a release that only publishes notes ships no artefact.
     if os.path.exists(os.path.join(repo, "package.json")) and not os.path.exists(os.path.join(repo, "go.mod")):
-        import json as _json
-
         with open(os.path.join(repo, "package.json"), encoding="utf-8") as f:
-            pkg = _json.load(f)
+            pkg = json.load(f)
         library = not has_docker and "bin" not in pkg and not pkg.get("private", False)
         repo_name = title(repo, npm=True)
         return render(repo_name, npm_build(repo, repo_name), "npm", has_docker, library=library)
