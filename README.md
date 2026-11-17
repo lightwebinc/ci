@@ -73,6 +73,22 @@ Tags are plain semver (`v0.1.0`). Callers move to a new release through their
 dependency updates: workflow refs as GitHub Actions updates, `gopipe` as a Go
 module update in `ci/go.mod`.
 
+## License generator
+
+`scripts/gen-third-party-licenses.py` writes a repository's
+`LICENSE-THIRD-PARTY` from what its Go packages link (`go list -deps`) or what
+its npm package installs (`npm ls --omit=dev --omit=peer`): every dependency's
+license texts, and the `NOTICE` file of each one that ships one. `--check`
+fails when the file on disk is stale.
+
+This is the only copy. A repository keeps a short
+`scripts/gen-third-party-licenses.py` of its own that downloads this file at a
+pinned commit, verifies its SHA-256, caches it under `~/.cache/lightwebinc-ci/`
+and runs it, so `make` targets and CI steps call the same path they always
+did. To move every repository to a newer generator, change the commit and the
+digest in that file and regenerate. `LICENCES_GEN=<path>` runs a local copy
+instead, for work on the generator itself.
+
 ## License
 
 Apache 2.0, see [LICENSE](LICENSE).

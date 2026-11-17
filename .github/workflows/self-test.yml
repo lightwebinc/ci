@@ -1,5 +1,6 @@
 # Checks this repository itself: every workflow passes workflow-lint
-# (actionlint with shellcheck, and zizmor), and the gopipe package builds and vets.
+# (actionlint with shellcheck, and zizmor), the gopipe package builds and vets,
+# and the licence generator's tests pass.
 name: self-test
 
 on:
@@ -30,3 +31,11 @@ jobs:
       - run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - run: go vet ./...
       - run: go build ./...
+
+  licence-generator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/test_gen_third_party_licenses.py
