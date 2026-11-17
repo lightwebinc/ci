@@ -148,6 +148,11 @@ class Npm(unittest.TestCase):
             self.assertEqual([(n, v) for n, v, _ in got], [("a", "1.0.0"), ("gone", "")])
             self.assertIsNone(got[1][2])
 
+    def test_only_a_library_leaves_its_peers_out(self):
+        self.assertIn("--omit=peer", gen.npm_ls_args(library=True))
+        self.assertNotIn("--omit=peer", gen.npm_ls_args(library=False))
+        self.assertIn("--omit=dev", gen.npm_ls_args(library=False))
+
     def test_a_package_that_is_not_installed_is_reported(self):
         with tempfile.TemporaryDirectory() as d:
             tree = {"name": "x", "dependencies": {"gone": {"version": "1.0.0"}}}

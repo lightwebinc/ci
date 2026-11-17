@@ -17,8 +17,10 @@ memory of it.
 Handles both a Go module and an npm package. The Go side reads `go list -deps`,
 so a module in go.mod that nothing imports is correctly absent and an INDIRECT
 dependency that IS imported is correctly present. The npm side reads
-`npm ls --omit=dev --omit=peer --all`, which is the tree an install of the
-package brings with it; a peer dependency is the installer's own.
+`npm ls --omit=dev --all`, the production tree. For a package published as a
+library it adds `--omit=peer`: a peer dependency is the installer's own copy.
+For an application, which is installed whole into an image, peers are
+installed with it and are listed.
 
 A module's NOTICE file is reproduced after its licence texts. Section 4(d) of
 the Apache License has the attribution notices in a NOTICE travel with the
@@ -220,13 +222,23 @@ def detect(texts):
     return ", ".join(sorted(found, key=found.get))
 
 
-def npm_tree(repo):
-    """The production dependency tree as npm reports it.
+def npm_ls_args(library):
+    """The npm ls command for the production tree.
 
-    Peer dependencies are left out. A peer is not installed by this package but
-    supplied by whoever installs it, as their own copy under their own
-    obligation, and npm 7+ would otherwise list it as though this package
-    brought it.
+    A library leaves peer dependencies out. A peer is not installed by the
+    library but supplied by whoever installs it, as their own copy under their
+    own obligation, and npm 7+ would otherwise list it as though the library
+    brought it. An application is the installer: npm installs its peers into
+    the same node_modules its image carries, so they are listed.
+    """
+    args = ["npm", "ls", "--omit=dev"]
+    if library:
+        args.append("--omit=peer")
+    return args + ["--all", "--json"]
+
+
+def npm_tree(repo, library=False):
+    """The production dependency tree as npm reports it.
 
     A tree npm could not read is a failure, never an empty tree: an empty
     tree renders as "nothing is installed", which is a claim. npm exits
@@ -242,7 +254,7 @@ def npm_tree(repo):
             raw = f.read()
     else:
         out = subprocess.run(
-            ["npm", "ls", "--omit=dev", "--omit=peer", "--all", "--json"],
+            npm_ls_args(library),
             cwd=repo, capture_output=True, text=True,
         )
         raw = out.stdout
@@ -292,7 +304,7 @@ def installed_at(repo, parent, name, version):
             d = os.path.dirname(d)
 
 
-def npm_packages(repo, tree=None):
+def npm_packages(repo, tree=None, library=False):
     """Every (name, version, directory) in the production tree, once each.
 
     `tsc` does not bundle: the built JavaScript resolves bare imports against
@@ -304,7 +316,7 @@ def npm_packages(repo, tree=None):
     the one without its dependencies.
     """
     if tree is None:
-        tree = npm_tree(repo)
+        tree = npm_tree(repo, library)
     seen = {}
 
     def walk(node, parent):
@@ -324,9 +336,9 @@ def npm_packages(repo, tree=None):
     return sorted((n, v, d) for (n, v), d in seen.items())
 
 
-def npm_build(repo, repo_name):
+def npm_build(repo, library):
     entries = []
-    for name, version, d in npm_packages(repo):
+    for name, version, d in npm_packages(repo, library=library):
         if not d:
             sys.exit(f"{name}@{version}: not installed under {repo}; run `npm ci` first")
         files = license_files(d)
@@ -369,7 +381,7 @@ def build(repo):
             pkg = json.load(f)
         library = not has_docker and "bin" not in pkg and not pkg.get("private", False)
         repo_name = title(repo, npm=True)
-        return render(repo_name, npm_build(repo, repo_name), "npm", has_docker, library=library)
+        return render(repo_name, npm_build(repo, library), "npm", has_docker, library=library)
     names = subprocess.run(
         ["go", "list", "-f", "{{.Name}}", "./..."],
         cwd=repo, capture_output=True, text=True, check=True,

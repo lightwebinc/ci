@@ -77,7 +77,8 @@ module update in `ci/go.mod`.
 
 `scripts/gen-third-party-licenses.py` writes a repository's
 `LICENSE-THIRD-PARTY` from what its Go packages link (`go list -deps`) or what
-its npm package installs (`npm ls --omit=dev --omit=peer`): every dependency's
+its npm package installs (`npm ls --omit=dev`, and `--omit=peer` for a
+library, whose peers are the installer's own): every dependency's
 license texts, and the `NOTICE` file of each one that ships one. `--check`
 fails when the file on disk is stale.
 
