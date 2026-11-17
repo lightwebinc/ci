@@ -137,6 +137,17 @@ class Npm(unittest.TestCase):
             self.assertEqual(got[("shared", "1.0.0")], "node_modules/parent/node_modules/shared")
             self.assertEqual(got[("shared", "2.0.0")], "node_modules/shared")
 
+    def test_absent_optional_dependency_is_skipped(self):
+        with tempfile.TemporaryDirectory() as d:
+            package(d, "node_modules/a", "a", "1.0.0", MIT)
+            tree = {"name": "x", "dependencies": {
+                "a": {"version": "1.0.0", "dependencies": {"fsevents": {}}},
+                "gone": {"required": "^1.0.0", "missing": True},
+            }}
+            got = gen.npm_packages(d, tree)
+            self.assertEqual([(n, v) for n, v, _ in got], [("a", "1.0.0"), ("gone", "")])
+            self.assertIsNone(got[1][2])
+
     def test_a_package_that_is_not_installed_is_reported(self):
         with tempfile.TemporaryDirectory() as d:
             tree = {"name": "x", "dependencies": {"gone": {"version": "1.0.0"}}}

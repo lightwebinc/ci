@@ -309,7 +309,11 @@ def npm_packages(repo, tree=None):
 
     def walk(node, parent):
         for name, info in sorted((node.get("dependencies") or {}).items()):
-            if not isinstance(info, dict):
+            # An empty object is npm's placeholder for an optional dependency
+            # that is absent on this platform: nothing is installed, so nothing
+            # is owed. A REQUIRED dependency that is missing is not empty (it
+            # says so, with the range that wanted it) and still fails below.
+            if not isinstance(info, dict) or not info:
                 continue
             version = info.get("version") or ""
             d = installed_at(repo, parent, name, version)
