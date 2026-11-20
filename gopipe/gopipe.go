@@ -54,7 +54,7 @@ const (
 	// release built against older x/tools cannot read newer export data and
 	// crashes instead of scanning. Re-check it on every toolchain bump.
 	// renovate: datasource=go depName=golang.org/x/vuln
-	GovulncheckVersion = "v1.9.0"
+	GovulncheckVersion = "v1.10.0"
 )
 
 // DefaultCommonModule is the shared module that consumer repos build against
