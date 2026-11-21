@@ -13,7 +13,7 @@ comment:
 ```yaml
 jobs:
   ci:
-    uses: lightwebinc/ci/.github/workflows/go-dagger.yml@<sha> # v0.6.1
+    uses: lightwebinc/ci/.github/workflows/go-dagger.yml@<sha> # v0.7.1
 ```
 
 | workflow | what it runs |
@@ -34,8 +34,9 @@ This repository's own workflows (not for callers):
 
 | workflow | what it runs |
 |---|---|
-| `self-test.yml` | `workflow-lint.yml` over this repository, and build + vet of `gopipe` |
+| `self-test.yml` | `workflow-lint.yml` over this repository, build + vet of `gopipe`, and the license generator's tests |
 | `release.yml` | on a `v*.*.*` tag, calls `gh-release.yml` |
+| `scorecard.yml` | OpenSSF Scorecard, weekly and on branch protection changes |
 
 `go-host.yml` fetches a caller's private Go modules when given
 `private-modules` (comma-separated repository names) and the
