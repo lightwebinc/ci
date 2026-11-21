@@ -32,6 +32,9 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
